@@ -1,0 +1,64 @@
+name: Build EXE with PyInstaller and Cache
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  MAIN_SCRIPT: example/3-exporter.py
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          if (Test-Path requirements.txt) {
+            pip install -r requirements.txt
+          }
+
+      - name: Cache PyInstaller dist
+        uses: actions/cache@v4
+        with:
+          path: dist
+          key: ${{ runner.os }}-pyinstaller-dist-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-pyinstaller-dist-
+
+      - name: Build EXE
+        run: |
+          echo "开始打包 ${{ env.MAIN_SCRIPT }}"
+          pyinstaller --noconsole --onefile ${{ env.MAIN_SCRIPT }}
+
+      - name: Show output files
+        run: dir dist
+
+      - name: Upload EXE Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: memotrace-exe
+          path: dist/3-exporter.exe
